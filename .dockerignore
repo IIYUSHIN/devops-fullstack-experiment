@@ -1,0 +1,42 @@
+# ============================================
+# .dockerignore — Files Docker Should Skip
+# ============================================
+# Similar to .gitignore — tells Docker which files NOT to copy
+# This makes the build faster and the image smaller
+
+# Dependencies (will be installed fresh inside container)
+node_modules
+
+# Build output (will be built fresh inside container)
+build
+
+# Git files (not needed in production)
+.git
+.gitignore
+
+# Docker files (no need to copy Docker config INTO the container)
+Dockerfile
+docker-compose.yml
+
+# Environment files (secrets should NOT be baked into images)
+.env
+.env.local
+.env.production
+
+# Terraform files (infrastructure code, not part of the app)
+terraform/
+
+# CI/CD config (not needed in production image)
+.github/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+LICENSE

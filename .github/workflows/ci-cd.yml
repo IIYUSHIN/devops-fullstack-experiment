@@ -1,0 +1,163 @@
+# ============================================
+# PART 2: CI/CD Pipeline — GitHub Actions
+# ============================================
+# This is the MAIN CI/CD workflow.
+# It runs when code is pushed to the 'main' branch.
+#
+# WHAT IT DOES (3 jobs):
+#   1. TEST    → Install dependencies, run unit tests
+#   2. BUILD   → Build Docker image, push to Docker Hub AND GitHub Container Registry
+#   3. NOTIFY  → Send Slack notification on success
+#
+# WHERE THE IMAGE GOES:
+#   → Docker Hub: docker.io/<your-dockerhub-username>/devops-fullstack-experiment:latest
+#   → GHCR: ghcr.io/<your-github-username>/devops-fullstack-experiment:latest
+
+name: CI/CD Pipeline
+
+# ── TRIGGER ──
+# This workflow runs when:
+#   - Code is pushed to the 'main' branch
+#   - A pull request is merged into 'main'
+on:
+  push:
+    branches: [ main ]
+
+# ── ENVIRONMENT VARIABLES ──
+# Available to ALL jobs in this workflow
+env:
+  GHCR_REGISTRY: ghcr.io
+  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/devops-fullstack-experiment
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+
+# ── JOBS ──
+jobs:
+
+  # ════════════════════════════════════════════
+  # JOB 1: TEST
+  # ════════════════════════════════════════════
+  # Purpose: Install dependencies and run all unit tests
+  # If tests fail, the pipeline stops here — no build or deploy
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Step 4: Run the test suite
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+
+  # ════════════════════════════════════════════
+  # JOB 2: BUILD AND PUSH
+  # ════════════════════════════════════════════
+  # Purpose: Build Docker image and push to BOTH Docker Hub AND GitHub Container Registry
+  # Only runs AFTER tests pass (needs: test)
+  build-and-push:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Docker Buildx (advanced Docker builder)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 4: Log in to GitHub Container Registry
+      # Uses the automatic GITHUB_TOKEN — no extra secrets needed
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 5: Extract metadata for Docker tags
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.GHCR_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=,format=short
+
+      # Step 6: Build and push the Docker image to BOTH registries
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            REACT_APP_VERSION=1.0.0
+            REACT_APP_ENV=production
+            REACT_APP_BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  # ════════════════════════════════════════════
+  # JOB 3: NOTIFY
+  # ════════════════════════════════════════════
+  # Purpose: Send deployment notification to Slack
+  # Only runs AFTER build succeeds (needs: build-and-push)
+  notify:
+    name: 📢 Send Notification
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            ✅ *Deployment Successful!*
+            📦 Docker Hub: `${{ env.DOCKERHUB_IMAGE }}:latest`
+            📦 GHCR: `${{ env.GHCR_IMAGE }}:latest`
+            🔗 Commit: `${{ github.sha }}`
+            👤 Author: `${{ github.actor }}`
+            📝 Message: `${{ github.event.head_commit.message }}`
+          fields: repo,message,commit,author,action,eventName,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        # If you don't use Slack, this step will be skipped gracefully
+        continue-on-error: true

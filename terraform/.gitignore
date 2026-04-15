@@ -1,0 +1,21 @@
+# Dependency lock file
+.terraform/
+.terraform.lock.hcl
+
+# Variable override files
+*.tfvars
+!terraform.tfvars
+
+# State files (NEVER commit these — they contain secrets)
+*.tfstate
+*.tfstate.backup
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
