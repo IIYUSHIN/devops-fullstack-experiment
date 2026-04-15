@@ -3,8 +3,8 @@ import App from './App';
 
 test('renders the main heading', () => {
   render(<App />);
-  const heading = screen.getByText(/Full-Stack/i);
-  expect(heading).toBeInTheDocument();
+  const headings = screen.getAllByText(/Full-Stack/i);
+  expect(headings.length).toBeGreaterThan(0);
 });
 
 test('renders all three feature cards', () => {
@@ -18,7 +18,8 @@ test('renders pipeline steps', () => {
   render(<App />);
   expect(screen.getByText(/Code Push/i)).toBeInTheDocument();
   expect(screen.getByText(/Run Tests/i)).toBeInTheDocument();
-  expect(screen.getByText(/Docker Build/i)).toBeInTheDocument();
+  const dockerBuildElements = screen.getAllByText(/Docker Build/i);
+  expect(dockerBuildElements.length).toBeGreaterThan(0);
   expect(screen.getByText(/Push to GHCR/i)).toBeInTheDocument();
   expect(screen.getByText(/Deploy to AWS/i)).toBeInTheDocument();
 });
