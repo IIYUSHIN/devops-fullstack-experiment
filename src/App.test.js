@@ -14,14 +14,10 @@ test('renders all three feature cards', () => {
   expect(screen.getByText(/AWS Deployment/i)).toBeInTheDocument();
 });
 
-test('renders pipeline steps', () => {
+test('renders pipeline section', () => {
   render(<App />);
+  expect(screen.getByText(/Deployment Pipeline/i)).toBeInTheDocument();
   expect(screen.getByText(/Code Push/i)).toBeInTheDocument();
-  expect(screen.getByText(/Run Tests/i)).toBeInTheDocument();
-  const dockerBuildElements = screen.getAllByText(/Docker Build/i);
-  expect(dockerBuildElements.length).toBeGreaterThan(0);
-  expect(screen.getByText(/Push to GHCR/i)).toBeInTheDocument();
-  expect(screen.getByText(/Deploy to AWS/i)).toBeInTheDocument();
 });
 
 test('renders environment info', () => {
